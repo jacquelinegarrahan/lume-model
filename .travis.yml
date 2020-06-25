@@ -1,51 +1,51 @@
-#  Travis uses virtual envs for python and here want to use conda python
-language: c
+language: python
+sudo: required
 
 branches:
   only:
   - master
-  - package-setup
+  - variable-definitions
 
-env:
-  # Build and test package on all supported python versions
-  # NOTE: Miniconda version could be widely expanded
-  - BUILD_TARGET=3.8 MINICONDA_VERSION=4.7.12
-  - BUILD_TARGET=3.7 MINICONDA_VERSION=4.7.12
-  - BUILD_TARGET=3.6 MINICONDA_VERSION=4.7.12
-  # To make sure it's still working with conda 4.6
-  - BUILD_TARGET=3.8 MINICONDA_VERSION=4.6.14
-  - BUILD_TARGET=3.7 MINICONDA_VERSION=4.6.14
-  - BUILD_TARGET=3.6 MINICONDA_VERSION=4.6.14
+matrix:
+  include:
+    - os: osx
+      language: generic
+      env: TOXENV=py37
+    - os: osx
+      language: generic
+      env: TOXENV=py38
+    - os: linux
+      python: 3.7
+    - os: linux
+      python: 3.8
 
-os:
-  - linux
-  - osx
-
-before_install:
-  # Install the appropriate miniconda depending on the os and miniconda version
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then MINICONDA_OS=Linux; else MINICONDA_OS=MacOSX; fi
-  - wget https://repo.anaconda.com/miniconda/Miniconda3-$MINICONDA_VERSION-$MINICONDA_OS-x86_64.sh -O miniconda.sh
-  - chmod +x miniconda.sh
-  - ./miniconda.sh -b
-  - export PATH=/home/travis/miniconda3/bin:$PATH
-  - conda update --yes conda  # Update CONDA without command line prompt
 
 install:
-  - conda install -y conda-build
+  # Install the appropriate miniconda depending on the os and miniconda version
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then MINICONDA_OS=Linux; else MINICONDA_OS=MacOSX; fi
+  - wget https://repo.anaconda.com/miniconda/Miniconda3-latest-$MINICONDA_OS-x86_64.sh -O miniconda.sh
+  - bash miniconda.sh -b -p "$HOME"/miniconda
+  - source "$HOME"/miniconda/etc/profile.d/conda.sh
 
-  # add conda forge for epics-base etc.
+  # set configs
+  - conda config --set always_yes yes --set changeps1 no
   - conda config --add channels conda-forge
+  - conda config --set channel_priority strict
 
-  # Build the conda recipe for this package
+  # log info for debugging
+  - conda info -a
+
+  # install conda build
+  - conda install conda-build
+
+  # create build & add to channel
   - conda build -q conda-recipe --python=$TRAVIS_PYTHON_VERSION --output-folder bld-dir
-
-  # Add the built package as a channel with highest priority
-  # this can eventually be used to deploy to conda-forge  
   - conda config --add channels "file://`pwd`/bld-dir"
 
-  # Create and activate a python environment
-  - conda create -n test-environment python=$TRAVIS_PYTHON_VERSION --file dev-requirements.txt --yes
-  - source activate test-environment
+  # create env
+  - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION --file dev-requirements.txt
+
+  - conda activate test-environment
 
 script:
   - pytest
