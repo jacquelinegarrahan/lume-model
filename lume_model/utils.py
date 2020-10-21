@@ -9,7 +9,7 @@ import pickle
 import json
 import sys
 import yaml
-from pydoc import locate
+from pydoc import locate, safeimport
 import numpy as np
 from typing import Tuple, List
 import logging
@@ -23,6 +23,14 @@ from lume_model.variables import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def locate(name):
+    components = name.split(".")
+    mod = __import__(components[0])
+    for comp in components[1:]:
+        mod = getattr(mod, comp)
+    return mod
 
 
 def save_variables(input_variables, output_variables, variable_file: str) -> None:
